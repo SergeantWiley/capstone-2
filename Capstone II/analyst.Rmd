@@ -1,0 +1,156 @@
+---
+
+---
+
+```{r}
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(jsonlite)
+library(methods)
+df <- read_csv('Sample 2 - Event Timeline.csv')
+print(df)
+
+```
+
+
+```{r cars}
+riot_games_ip <- "192.207.0.1"
+filter_df = df[df$Destination == riot_games_ip | df$Source == riot_games_ip,]
+print(filter_df)
+```
+
+
+
+```{R}
+data_size <- filter_df %>%
+  group_by(Time,Length) %>%
+  summarise(count = n())
+print(data_size)
+```
+
+```{r}
+data_size <- filter_df %>%
+  group_by(Time, Length) %>%
+  summarise(count = n()) %>%
+  arrange(count)
+
+length_counts <- filter_df %>%
+  group_by(Length) %>%
+  summarise(count = n()) %>%
+  filter(count >= 100)
+
+ggplot(data = length_counts, aes(x = Length, y = count)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Length", y = "Count", title = "Frequency of Each Length Value") +
+  theme_minimal()
+```
+```{r}
+
+library(jsonlite)
+
+payload_data <- fromJSON('Sample 3 - Angle Data.json')
+
+udp_data <- c()
+time_data <- c()
+
+for (i in 1:length(payload_data$`_source`)) {
+  udp_payload <- payload_data$`_source`[i]$layers$udp$`udp.payload`
+  time_payload <- payload_data$`_source`[i]$layers$frame$`frame.time_relative`
+  udp_data <- c(udp_data, udp_payload)
+  time_data <- c(time_data, time_payload)
+}
+
+payload <- data.frame(payload = udp_data, time = time_data)
+print(payload)
+
+
+
+```
+```{R}
+library(stringr)
+payload$time <- as.POSIXct(as.numeric(payload$time), origin = "1970-01-01", tz = "UTC")
+filtered_payload <- payload %>%
+  filter(str_starts(payload, '98:3f:ec:57:9c:32:fa:8d:')) %>%
+  mutate(payload = str_replace(payload, '98:3f:ec:57:9c:32:fa:8d:', '')) %>%
+  filter(!str_detect(payload, '01:00:00:00:00:00:00:00:00:00:00:00:00:00:00:0'))
+
+print(filtered_payload)
+
+
+# Calculate time difference
+payload <- payload %>%
+  mutate(time_diff = difftime(time, lag(time), units = "secs")) %>%
+  filter(!is.na(time_diff))
+
+# Define chunk size
+chunk_size <- 100
+
+# Calculate mean time difference for each chunk
+payload$chunk <- (seq_len(nrow(payload)) - 1) %/% chunk_size
+condensed_data <- payload %>%
+  group_by(chunk) %>%
+  summarise(mean_time_diff = mean(time_diff))
+
+# Plot the bar graph
+ggplot(condensed_data, aes(x = factor(chunk), y = mean_time_diff)) +
+  geom_bar(stat = "identity", fill = "red") +
+  labs(title = "Payload Chunk Time Interval",
+       x = paste("Package Chunk (", chunk_size, " packets)", sep = ""),
+       y = "Time Difference (seconds)") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+print(condensed_data)
+
+
+```
+```{r}
+payload_data <- fromJSON('Sample 3 - Angle Data.json')
+
+udp_data <- c()
+time_data <- c()
+
+for (i in 1:length(payload_data$`_source`)) {
+  udp_payload <- payload_data$`_source`[i]$layers$udp$`udp.payload`
+  time_payload <- payload_data$`_source`[i]$layers$frame$`frame.time_relative`
+  udp_data <- c(udp_data, udp_payload)
+  time_data <- c(time_data, time_payload)
+}
+
+payload <- data.frame(payload = udp_data, time = time_data)
+
+
+filtered_payload <- payload %>%
+  filter(str_starts(payload, '44:99:a2:b4:46:32:fa:8c:')) %>%
+  mutate(payload = str_replace(payload, '44:99:a2:b4:46:32:fa:8c:', ''))
+
+
+print(filtered_payload)
+
+# Extract first two characters and convert from hex to int
+angle <- substr(filtered_payload$payload, 1,2)
+angle <- data.frame(angle = angle, index=1:length(angle))
+angle$angle <- as.hexmode(angle$angle)
+angle$angle <- as.integer(angle$angle)
+angle$time <- filtered_payload$time
+
+
+print(angle)
+# Calculate difference
+sync <- which(angle$angle == 254)
+difference <- data.frame(angle = difference, index = difference_index)
+synchronization <- diff(difference_index)
+print(difference)
+# Plot
+ggplot(data = angle, aes(x = seq_along(index), y = angle)) +
+  geom_line(linetype = "dashed", color = "red") +
+  labs(title = "Synchronization",
+       x = "Index",
+       y = "Hex to Int Converter") +
+  theme_minimal() +
+  theme(panel.grid.major = element_line(color = "grey"))
+
+
+```
+
